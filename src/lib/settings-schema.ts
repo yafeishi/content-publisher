@@ -1,0 +1,126 @@
+export type WritingStylePreset =
+  | 'professional-review'
+  | 'friend-chat'
+  | 'calm-analysis'
+  | 'practical-tutorial'
+  | 'storytelling';
+
+export type WritingStyleProfile = {
+  selfPositioning: string;
+  signaturePhrases: string;
+  bannedPhrases: string;
+  personalExperience: string;
+  toneNotes: string;
+};
+
+export type AppSettings = {
+  aiProvider: 'claude-cli' | 'openai-compatible' | 'codex-api' | 'local-client';
+  claudePath: string;
+  localClientPreset: 'codex' | 'claude' | 'gemini' | 'qwen' | 'custom';
+  localClientCommand: string;
+  aiModel: string;
+  enableXiaohongshu: boolean;
+  enableWechat: boolean;
+  wechatPublishMode: 'article' | 'text';
+  enableMowen: boolean;
+  enableObsidian: boolean;
+  fallbackCoverImage: string;
+  mowenDefaultPublic: boolean;
+  mowenSyncImages: boolean;
+  mowenRichLayout: boolean;
+  obsidianVaultPath: string;
+  obsidianFolder: string;
+  obsidianAssetFolder: string;
+  obsidianLinkStyle: 'markdown' | 'wikilink';
+  obsidianOverwrite: boolean;
+  notifyOnSuccess: boolean;
+  notifyOnFailure: boolean;
+  notifyOnSchedule: boolean;
+  compactEditor: boolean;
+  defaultLayoutTemplateId: string;
+  writingStylePreset: WritingStylePreset;
+  writingStyleProfile: WritingStyleProfile;
+  humanizeRewriteEnabled: boolean;
+};
+
+export const defaultAppSettings: AppSettings = {
+  aiProvider: 'claude-cli',
+  claudePath: 'claude',
+  localClientPreset: 'codex',
+  localClientCommand: 'codex',
+  aiModel: 'default',
+  enableXiaohongshu: true,
+  enableWechat: true,
+  wechatPublishMode: 'article',
+  enableMowen: true,
+  enableObsidian: true,
+  fallbackCoverImage: '',
+  mowenDefaultPublic: true,
+  mowenSyncImages: true,
+  mowenRichLayout: true,
+  obsidianVaultPath: '',
+  obsidianFolder: 'Inbox',
+  obsidianAssetFolder: 'assets/content-publisher',
+  obsidianLinkStyle: 'wikilink',
+  obsidianOverwrite: false,
+  notifyOnSuccess: true,
+  notifyOnFailure: true,
+  notifyOnSchedule: true,
+  compactEditor: false,
+  defaultLayoutTemplateId: 'standard',
+  writingStylePreset: 'professional-review',
+  writingStyleProfile: {
+    selfPositioning: '一线做项目的工程实践者',
+    signaturePhrases: '我这边实测；我踩过的坑是；我的建议是',
+    bannedPhrases: '赋能；闭环；颠覆式；首先其次最后；综上所述',
+    personalExperience: '',
+    toneNotes: '少空话，多细节，像给同事复盘',
+  },
+  humanizeRewriteEnabled: true,
+};
+
+export function sanitizeAppSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
+  if (!input || typeof input !== 'object') return defaultAppSettings;
+  const provider = input.aiProvider;
+  const localPreset = input.localClientPreset;
+  const writingStylePreset = input.writingStylePreset;
+  const safeProfileInput: Partial<WritingStyleProfile> = (
+    input.writingStyleProfile && typeof input.writingStyleProfile === 'object'
+  )
+    ? input.writingStyleProfile
+    : {};
+  const safeProfile: WritingStyleProfile = {
+    selfPositioning: typeof safeProfileInput.selfPositioning === 'string' ? safeProfileInput.selfPositioning : defaultAppSettings.writingStyleProfile.selfPositioning,
+    signaturePhrases: typeof safeProfileInput.signaturePhrases === 'string' ? safeProfileInput.signaturePhrases : defaultAppSettings.writingStyleProfile.signaturePhrases,
+    bannedPhrases: typeof safeProfileInput.bannedPhrases === 'string' ? safeProfileInput.bannedPhrases : defaultAppSettings.writingStyleProfile.bannedPhrases,
+    personalExperience: typeof safeProfileInput.personalExperience === 'string' ? safeProfileInput.personalExperience : defaultAppSettings.writingStyleProfile.personalExperience,
+    toneNotes: typeof safeProfileInput.toneNotes === 'string' ? safeProfileInput.toneNotes : defaultAppSettings.writingStyleProfile.toneNotes,
+  };
+  return {
+    ...defaultAppSettings,
+    ...input,
+    aiProvider:
+      provider === 'openai-compatible' || provider === 'codex-api' || provider === 'local-client'
+        ? provider
+        : 'claude-cli',
+    localClientPreset:
+      localPreset === 'codex' || localPreset === 'claude' || localPreset === 'gemini' || localPreset === 'qwen' || localPreset === 'custom'
+        ? localPreset
+        : 'codex',
+    wechatPublishMode: input.wechatPublishMode === 'text' ? 'text' : 'article',
+    fallbackCoverImage: typeof input.fallbackCoverImage === 'string' ? input.fallbackCoverImage : '',
+    obsidianLinkStyle: input.obsidianLinkStyle === 'markdown' ? 'markdown' : 'wikilink',
+    defaultLayoutTemplateId: typeof input.defaultLayoutTemplateId === 'string' && input.defaultLayoutTemplateId.trim()
+      ? input.defaultLayoutTemplateId.trim()
+      : 'standard',
+    writingStylePreset:
+      writingStylePreset === 'friend-chat'
+      || writingStylePreset === 'calm-analysis'
+      || writingStylePreset === 'practical-tutorial'
+      || writingStylePreset === 'storytelling'
+        ? writingStylePreset
+        : 'professional-review',
+    writingStyleProfile: safeProfile,
+    humanizeRewriteEnabled: input.humanizeRewriteEnabled !== false,
+  };
+}
