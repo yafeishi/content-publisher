@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Search, FileText, MoreVertical, Edit, Trash2, Play } from 'lucide-react';
 import { useDialog } from '@/components/ui/dialog-center';
+import { platformLabel } from '@/lib/publishing-platforms';
 
 interface Content {
   id: string;
@@ -32,14 +33,6 @@ interface PublishResultItem {
   error?: string;
   warning?: string;
 }
-
-const getPlatformDisplayName = (platform: string) => {
-  if (platform === 'xiaohongshu') return '小红书';
-  if (platform === 'wechat') return '微信公众号';
-  if (platform === 'mowen') return '墨问笔记';
-  if (platform === 'obsidian') return 'Obsidian';
-  return platform;
-};
 
 const resolveFilterFromQuery = (statusParam: string | null): StatusFilter => {
   if (!statusParam) return 'all';
@@ -184,7 +177,7 @@ function ContentListView() {
         const warnings: string[] = [];
 
         for (const [platform, result] of Object.entries(results)) {
-          const name = getPlatformDisplayName(platform);
+          const name = platformLabel(platform);
           if (result.success) {
             successes.push(name);
             if (result.warning) warnings.push(`${name}: ${result.warning}`);

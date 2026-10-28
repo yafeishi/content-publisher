@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { platformLabel } from '@/lib/publishing-platforms';
 
 type PreviewTheme = 'standard' | 'magazine' | 'minimal' | 'contrast';
 
@@ -27,11 +28,7 @@ const PREVIEW_THEMES: Array<{ id: PreviewTheme; label: string }> = [
 ];
 
 function getPlatformDisplayName(platform: string) {
-  if (platform === 'xiaohongshu') return '小红书';
-  if (platform === 'wechat') return '微信公众号';
-  if (platform === 'mowen') return '墨问笔记';
-  if (platform === 'obsidian') return 'Obsidian';
-  return platform;
+  return platformLabel(platform);
 }
 
 function isVideoPath(assetPath: string) {

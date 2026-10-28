@@ -471,6 +471,7 @@ export default function SettingsPage() {
             <ToggleRow label="微信公众号" checked={settings.enableWechat} onChange={(v) => update('enableWechat', v)} />
             <ToggleRow label="墨问笔记" checked={settings.enableMowen} onChange={(v) => update('enableMowen', v)} />
             <ToggleRow label="Obsidian 本地发布" checked={settings.enableObsidian} onChange={(v) => update('enableObsidian', v)} />
+            <ToggleRow label="个人主页(danghb.cn)" checked={settings.enableHomepage} onChange={(v) => update('enableHomepage', v)} />
           </div>
           <div className="mt-4 rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface-soft)' }}>
             <label className="block">
@@ -695,6 +696,111 @@ export default function SettingsPage() {
               checked={settings.obsidianOverwrite}
               onChange={(v) => update('obsidianOverwrite', v)}
             />
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="个人主页（danghb.cn）"
+          icon={<Globe className="h-5 w-5 text-sky-600" />}
+          defaultOpen={false}
+        >
+          <div className="space-y-4">
+            <p className="theme-muted text-xs leading-6">
+              danghb.cn 的笔记不是单独的写入接口。线上站点仓库是
+              {' '}
+              <span className="font-medium">github.com/yafeishi/yafeishi.github.io</span>
+              （本机目录有时叫 hobson-homepage 或 danghb-homepage）。每篇笔记是
+              {' '}
+              <span className="font-medium">app/(zh)/notes/&lt;slug&gt;/page.tsx</span>
+              ，图片在 public/notes/&lt;slug&gt;/，并出现在主页「最新文章」。推送到 master 后，GitHub Pages 执行 next export，公开地址形如 https://danghb.cn/notes/&lt;slug&gt;/。
+            </p>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>主页仓库路径</span>
+              <input
+                value={settings.homepageRepoPath}
+                onChange={(e) => update('homepageRepoPath', e.target.value)}
+                className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                placeholder="/Users/you/code/yafeishi.github.io"
+              />
+              <p className="theme-muted mt-1 text-xs">环境变量 HOMEPAGE_REPO_PATH 会覆盖这里。路径只存在本机设置里，不会写进仓库。</p>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Git 远程</span>
+              <input
+                value={settings.homepageRepoRemote}
+                onChange={(e) => update('homepageRepoRemote', e.target.value)}
+                className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                placeholder="https://github.com/yafeishi/yafeishi.github.io.git"
+              />
+            </label>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>发布分支</span>
+                <input
+                  value={settings.homepageBranch}
+                  onChange={(e) => update('homepageBranch', e.target.value)}
+                  className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                  placeholder="master"
+                />
+                <p className="theme-muted mt-1 text-xs">GitHub Pages 监听 master / main。当前线上默认分支是 master。发布时仓库必须已经在这个分支上。</p>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>站点地址</span>
+                <input
+                  value={settings.homepageSiteOrigin}
+                  onChange={(e) => update('homepageSiteOrigin', e.target.value)}
+                  className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                  placeholder="https://danghb.cn"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>发布方式</span>
+              <select
+                value={settings.homepagePublishMode}
+                onChange={(e) => update('homepagePublishMode', e.target.value as AppSettings['homepagePublishMode'])}
+                className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+              >
+                <option value="commit-push">提交并推送（Pages 部署后得到公开 URL）</option>
+                <option value="pull-request">只开 Pull Request，不合并</option>
+                <option value="files-only">只写本地文件，不推送</option>
+              </select>
+            </label>
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface-soft)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>推送凭证</p>
+              <p className="theme-muted mt-1 text-xs leading-6">
+                在环境变量 HOMEPAGE_GITHUB_TOKEN 中放一个对该仓库有 contents 写权限的 token。不要把它填进设置，也不要提交到 git。未设置时，commit-push 会使用本机已有的 git 凭据。可选 HOMEPAGE_GIT_NAME / HOMEPAGE_GIT_EMAIL 指定提交身份。
+              </p>
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>文末来源</span>
+              <input
+                value={settings.homepageCredit}
+                onChange={(e) => update('homepageCredit', e.target.value)}
+                className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+              />
+            </label>
+            <ToggleRow
+              label="屏蔽育儿内容"
+              hint="标题或标签命中下面的词时，拒绝同步到职业主页。Hobson 小党 / 霍普森小岛的科技、出海、工具内容可以发；党哥育儿不要发。"
+              checked={settings.homepageBlockParenting}
+              onChange={(v) => update('homepageBlockParenting', v)}
+            />
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>屏蔽词</span>
+              <input
+                value={settings.homepageBlockTags}
+                onChange={(e) => update('homepageBlockTags', e.target.value)}
+                className="theme-input w-full rounded-xl px-3 py-2 text-sm"
+                placeholder="育儿,党哥育儿,parenting,亲子"
+              />
+            </label>
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--surface-soft)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Slug 规则</p>
+              <p className="theme-muted mt-1 text-xs leading-6">
+                优先使用标签 homepage-slug:hermes-ttft。只允许小写字母、数字和连字符。没有这个标签时，从标题里的英文和数字生成，例如「GPT-6 四档怎么选」会变成 gpt-6。纯中文标题会变成 note- 加内容 ID 后缀。分类标签可用 homepage-kicker:Agent / Browser。layout-template: 和 series: 不会写进笔记。
+              </p>
+            </div>
           </div>
         </CollapsibleSection>
 

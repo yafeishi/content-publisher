@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import solarLunar from 'solarlunar';
 import chineseWorkday from 'chinese-workday';
+import { platformLabel, PUBLISHING_PLATFORMS } from '@/lib/publishing-platforms';
 
 interface ContentItem {
     id: string;
@@ -34,13 +35,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string; lab
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
-const getPlatformDisplayName = (platform: string) => {
-    if (platform === 'xiaohongshu') return '小红书';
-    if (platform === 'wechat') return '微信';
-    if (platform === 'mowen') return '墨问';
-    if (platform === 'obsidian') return 'Obsidian';
-    return platform;
-};
+const getPlatformDisplayName = (platform: string) => platformLabel(platform, 'short');
 
 function getDaysInMonth(year: number, month: number) {
     return new Date(year, month + 1, 0).getDate();
@@ -64,7 +59,7 @@ export default function CalendarPage() {
     const [contents, setContents] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'xiaohongshu' | 'wechat' | 'mowen' | 'obsidian'>('all');
+    const [selectedPlatform, setSelectedPlatform] = useState('all');
 
     useEffect(() => {
         fetchContents();
@@ -269,16 +264,13 @@ export default function CalendarPage() {
                             <div className="flex flex-wrap items-center gap-2">
                                 {[
                                     { value: 'all', label: '全部渠道' },
-                                    { value: 'xiaohongshu', label: '小红书' },
-                                    { value: 'wechat', label: '微信' },
-                                    { value: 'mowen', label: '墨问' },
-                                    { value: 'obsidian', label: 'Obsidian' },
+                                    ...PUBLISHING_PLATFORMS.map((item) => ({ value: item.id, label: item.shortLabel })),
                                 ].map((item) => {
                                     const isActive = selectedPlatform === item.value;
                                     return (
                                         <button
                                             key={item.value}
-                                            onClick={() => setSelectedPlatform(item.value as 'all' | 'xiaohongshu' | 'wechat' | 'mowen' | 'obsidian')}
+                                            onClick={() => setSelectedPlatform(item.value)}
                                             className={`px-3 py-1.5 text-xs rounded-full transition-colors ${isActive
                                                     ? 'bg-blue-600 text-white'
                                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
