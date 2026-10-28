@@ -33,6 +33,15 @@ export type AppSettings = {
   obsidianAssetFolder: string;
   obsidianLinkStyle: 'markdown' | 'wikilink';
   obsidianOverwrite: boolean;
+  enableHomepage: boolean;
+  homepageRepoPath: string;
+  homepageRepoRemote: string;
+  homepageBranch: string;
+  homepageSiteOrigin: string;
+  homepagePublishMode: 'commit-push' | 'pull-request' | 'files-only';
+  homepageBlockParenting: boolean;
+  homepageBlockTags: string;
+  homepageCredit: string;
   notifyOnSuccess: boolean;
   notifyOnFailure: boolean;
   notifyOnSchedule: boolean;
@@ -63,6 +72,15 @@ export const defaultAppSettings: AppSettings = {
   obsidianAssetFolder: 'assets/content-publisher',
   obsidianLinkStyle: 'wikilink',
   obsidianOverwrite: false,
+  enableHomepage: false,
+  homepageRepoPath: '',
+  homepageRepoRemote: 'https://github.com/yafeishi/yafeishi.github.io.git',
+  homepageBranch: 'master',
+  homepageSiteOrigin: 'https://danghb.cn',
+  homepagePublishMode: 'commit-push',
+  homepageBlockParenting: true,
+  homepageBlockTags: '育儿,党哥育儿,parenting,亲子',
+  homepageCredit: '同步自微信公众号「Hobson 小党」',
   notifyOnSuccess: true,
   notifyOnFailure: true,
   notifyOnSchedule: true,
@@ -78,6 +96,22 @@ export const defaultAppSettings: AppSettings = {
   },
   humanizeRewriteEnabled: true,
 };
+
+function sanitizeHomepageOrigin(value: unknown): string {
+  if (typeof value !== 'string') return defaultAppSettings.homepageSiteOrigin;
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[^\s/]+/i.test(trimmed)) return defaultAppSettings.homepageSiteOrigin;
+  return trimmed;
+}
+
+function sanitizeHomepageBranch(value: unknown): string {
+  if (typeof value !== 'string') return defaultAppSettings.homepageBranch;
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9._/-]+$/.test(trimmed) || trimmed.includes('..') || trimmed.startsWith('/') || trimmed.endsWith('/')) {
+    return defaultAppSettings.homepageBranch;
+  }
+  return trimmed;
+}
 
 export function sanitizeAppSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   if (!input || typeof input !== 'object') return defaultAppSettings;
@@ -110,6 +144,23 @@ export function sanitizeAppSettings(input: Partial<AppSettings> | null | undefin
     wechatPublishMode: input.wechatPublishMode === 'text' ? 'text' : 'article',
     fallbackCoverImage: typeof input.fallbackCoverImage === 'string' ? input.fallbackCoverImage : '',
     obsidianLinkStyle: input.obsidianLinkStyle === 'markdown' ? 'markdown' : 'wikilink',
+    enableHomepage: input.enableHomepage === true,
+    homepageRepoPath: typeof input.homepageRepoPath === 'string' ? input.homepageRepoPath : '',
+    homepageRepoRemote: typeof input.homepageRepoRemote === 'string'
+      ? input.homepageRepoRemote.trim()
+      : defaultAppSettings.homepageRepoRemote,
+    homepageBranch: sanitizeHomepageBranch(input.homepageBranch),
+    homepageSiteOrigin: sanitizeHomepageOrigin(input.homepageSiteOrigin),
+    homepagePublishMode: input.homepagePublishMode === 'pull-request' || input.homepagePublishMode === 'files-only'
+      ? input.homepagePublishMode
+      : 'commit-push',
+    homepageBlockParenting: input.homepageBlockParenting !== false,
+    homepageBlockTags: typeof input.homepageBlockTags === 'string' && input.homepageBlockTags.trim()
+      ? input.homepageBlockTags
+      : defaultAppSettings.homepageBlockTags,
+    homepageCredit: typeof input.homepageCredit === 'string'
+      ? input.homepageCredit.slice(0, 200)
+      : defaultAppSettings.homepageCredit,
     defaultLayoutTemplateId: typeof input.defaultLayoutTemplateId === 'string' && input.defaultLayoutTemplateId.trim()
       ? input.defaultLayoutTemplateId.trim()
       : 'standard',

@@ -11,9 +11,6 @@ import {
   Sparkles,
   Eye,
   Trash2,
-  CheckCircle,
-  XCircle,
-  Clock,
   Image as ImageIcon,
 } from 'lucide-react';
 import AiImageInsertDialog from '@/components/AiImageInsertDialog';
@@ -22,7 +19,11 @@ import RichTextEditor from '@/components/RichTextEditor';
 import ImageManager from '@/components/ImageManager';
 import ContentPreviewModal from '@/components/ContentPreviewModal';
 import { useDialog } from '@/components/ui/dialog-center';
+import PublishingPlatformPicker, { type PlatformHealthResult } from '@/components/PublishingPlatformPicker';
+import PublishDistributionCard, { type PublishRecordItem } from '@/components/PublishDistributionCard';
+import { homepageBlockReason, parseBlockTagList } from '@/lib/homepage-note';
 import type { LayoutTemplate } from '@/lib/layout-template-types';
+import { platformLabel, PUBLISHING_PLATFORM_IDS } from '@/lib/publishing-platforms';
 import type { AppSettings } from '@/lib/settings-schema';
 
 interface Content {
@@ -61,27 +62,6 @@ interface PolishCompareCandidate {
 }
 
 type TiptapInsertImageFn = (src: string, alt?: string) => void;
-
-interface PublishStatus {
-  xiaohongshu?: 'pending' | 'success' | 'failed';
-  wechat?: 'pending' | 'success' | 'failed';
-  mowen?: 'pending' | 'success' | 'failed';
-  obsidian?: 'pending' | 'success' | 'failed';
-}
-
-interface PlatformHealthResult {
-  ok: boolean;
-  status: 'success' | 'warning' | 'failed';
-  message: string;
-}
-
-const getPlatformDisplayName = (platform: string) => {
-  if (platform === 'xiaohongshu') return '小红书';
-  if (platform === 'wechat') return '微信公众号';
-  if (platform === 'mowen') return '墨问笔记';
-  if (platform === 'obsidian') return 'Obsidian';
-  return platform;
-};
 
 const isVideoPath = (assetPath: string) => /\.(mp4|mov|webm|m4v|avi)$/i.test(assetPath);
 const isImagePath = (assetPath: string) => !isVideoPath(assetPath);
@@ -124,7 +104,9 @@ export default function ContentDetail() {
   const [showAiImageDialog, setShowAiImageDialog] = useState(false);
   const [aiImagePromptSeed, setAiImagePromptSeed] = useState('');
   const [logs, setLogs] = useState<LogItem[]>([]);
-  const [publishStatus, setPublishStatus] = useState<PublishStatus>({});
+  const [publishRecords, setPublishRecords] = useState<PublishRecordItem[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [homepageGuard, setHomepageGuard] = useState({ blockParenting: true, blockTags: '育儿,党哥育儿,parenting,亲子' });
   const [isTestingPlatforms, setIsTestingPlatforms] = useState(false);
   const [platformHealth, setPlatformHealth] = useState<Record<string, PlatformHealthResult>>({});
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -144,24 +126,14 @@ export default function ContentDetail() {
   const hasCoverImage = Boolean(coverImage && isImagePath(coverImage));
   const xiaohongshuImageCount = selectedImageCount + (hasCoverImage && !selectedImages.includes(coverImage as string) ? 1 : 0);
 
-  const updatePublishStatus = (newLogs: LogItem[]) => {
-    const status: PublishStatus = {};
-    newLogs.forEach((log) => {
-      if (log.action?.includes('小红书')) {
-        status.xiaohongshu = log.result?.includes('成功') ? 'success' : 'failed';
-      }
-      if (log.action?.includes('微信') || log.action?.includes('wechat')) {
-        status.wechat = log.result?.includes('成功') ? 'success' : 'failed';
-      }
-      if (log.action?.includes('墨问') || log.action?.includes('mowen')) {
-        status.mowen = log.result?.includes('成功') ? 'success' : 'failed';
-      }
-      if (log.action?.includes('Obsidian') || log.action?.includes('obsidian')) {
-        status.obsidian = log.result?.includes('成功') ? 'success' : 'failed';
-      }
-    });
-    setPublishStatus(status);
-  };
+  const homepageNotice = platforms.includes('homepage')
+    ? homepageBlockReason({
+      title,
+      tags: baseTags,
+      enabled: homepageGuard.blockParenting,
+      blockTags: parseBlockTagList(homepageGuard.blockTags),
+    })
+    : null;
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -185,13 +157,17 @@ export default function ContentDetail() {
           fetch('/api/templates'),
         ]);
         if (settingsResp.ok) {
-          const settings = await settingsResp.json() as Pick<AppSettings, 'defaultLayoutTemplateId' | 'writingStylePreset'>;
+          const settings = await settingsResp.json() as Pick<AppSettings, 'defaultLayoutTemplateId' | 'writingStylePreset' | 'homepageBlockParenting' | 'homepageBlockTags'>;
           if (settings.defaultLayoutTemplateId) {
             setSelectedLayoutTemplateId(settings.defaultLayoutTemplateId);
           }
           if (settings.writingStylePreset) {
             setSelectedWritingStyle(settings.writingStylePreset);
           }
+          setHomepageGuard({
+            blockParenting: settings.homepageBlockParenting !== false,
+            blockTags: settings.homepageBlockTags || '育儿,党哥育儿,parenting,亲子',
+          });
         }
         if (templatesResp.ok) {
           const data = await templatesResp.json() as { templates?: LayoutTemplate[] };
@@ -256,10 +232,24 @@ export default function ContentDetail() {
       if (response.ok) {
         const data = await response.json();
         setLogs(data);
-        updatePublishStatus(data);
       }
     } catch (error) {
       console.error('Failed to fetch logs:', error);
+    }
+  }, [params.id]);
+
+  const fetchPublishRecords = useCallback(async () => {
+    if (!params.id) return;
+    setRecordsLoading(true);
+    try {
+      const response = await fetch(`/api/content/${params.id}/publish-records`);
+      if (!response.ok) return;
+      const data = await response.json() as { records?: PublishRecordItem[] };
+      setPublishRecords(Array.isArray(data.records) ? data.records : []);
+    } catch (error) {
+      console.error('Failed to fetch publish records:', error);
+    } finally {
+      setRecordsLoading(false);
     }
   }, [params.id]);
 
@@ -267,8 +257,9 @@ export default function ContentDetail() {
     if (params.id) {
       fetchContent();
       fetchLogs();
+      fetchPublishRecords();
     }
-  }, [params.id, fetchContent, fetchLogs]);
+  }, [params.id, fetchContent, fetchLogs, fetchPublishRecords]);
 
   const handleSave = async () => {
     return saveDraft(title, body);
@@ -332,7 +323,7 @@ export default function ContentDetail() {
       {
         id: createClientLogId(),
         action: '开始发布',
-        result: `发布到: ${platforms.map(getPlatformDisplayName).join(', ')}`,
+        result: `发布到: ${platforms.map((item) => platformLabel(item)).join(', ')}`,
         createdAt: new Date().toISOString(),
       },
     ]);
@@ -356,7 +347,7 @@ export default function ContentDetail() {
         const warnings: string[] = [];
 
         for (const [platform, result] of Object.entries(typedResults)) {
-          const platformName = getPlatformDisplayName(platform);
+          const platformName = platformLabel(platform);
           if (result.success) {
             successes.push(result.message || `${platformName}: 发布成功`);
             if (result.warning) warnings.push(`${platformName}: ${result.warning}`);
@@ -396,6 +387,7 @@ export default function ContentDetail() {
       notify('发布失败', 'error');
     } finally {
       setIsPublishing(false);
+      fetchPublishRecords();
     }
   };
 
@@ -406,7 +398,7 @@ export default function ContentDetail() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          platforms: ['xiaohongshu', 'wechat', 'mowen', 'obsidian'],
+          platforms: PUBLISHING_PLATFORM_IDS,
         }),
       });
       const data = await response.json() as {
@@ -833,84 +825,12 @@ export default function ContentDetail() {
                 {isTestingPlatforms ? '检测中...' : '连通性测试'}
               </button>
             </div>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('xiaohongshu')}
-                  onChange={() => togglePlatform('xiaohongshu')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>小红书</span>
-                {platformHealth.xiaohongshu && (
-                  <span className={`ml-auto text-xs ${platformHealth.xiaohongshu.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.xiaohongshu.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.xiaohongshu.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('wechat')}
-                  onChange={() => togglePlatform('wechat')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>微信公众号</span>
-                {platformHealth.wechat && (
-                  <span className={`ml-auto text-xs ${platformHealth.wechat.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.wechat.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.wechat.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('mowen')}
-                  onChange={() => togglePlatform('mowen')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>墨问笔记</span>
-                {platformHealth.mowen && (
-                  <span className={`ml-auto text-xs ${platformHealth.mowen.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.mowen.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.mowen.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('obsidian')}
-                  onChange={() => togglePlatform('obsidian')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Obsidian</span>
-                {platformHealth.obsidian && (
-                  <span className={`ml-auto text-xs ${platformHealth.obsidian.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.obsidian.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.obsidian.message}
-                  </span>
-                )}
-              </label>
-            </div>
+            <PublishingPlatformPicker
+              platforms={platforms}
+              onToggle={togglePlatform}
+              health={platformHealth}
+              notice={homepageNotice}
+            />
 
             {platforms.includes('xiaohongshu') && xiaohongshuImageCount === 0 && (
               <div className="mt-3 p-2 bg-red-50 rounded-lg">
@@ -931,106 +851,7 @@ export default function ContentDetail() {
             projectId={projectId || null}
           />
 
-          {/* Publish status */}
-          {(publishStatus.xiaohongshu || publishStatus.wechat || publishStatus.mowen || publishStatus.obsidian) && (
-            <div className="theme-card p-5">
-              <h3 className="theme-title mb-4 font-semibold">发布状态</h3>
-              <div className="space-y-3">
-                {publishStatus.xiaohongshu && (
-                  <div className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--surface-soft)' }}>
-                    {publishStatus.xiaohongshu === 'success' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : publishStatus.xiaohongshu === 'failed' ? (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <div>
-                      <div className="theme-title text-sm font-medium">
-                        小红书
-                      </div>
-                      <div className="theme-muted text-xs">
-                        {publishStatus.xiaohongshu === 'success'
-                          ? '发布成功'
-                          : publishStatus.xiaohongshu === 'failed'
-                            ? '发布失败'
-                            : '等待中'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {publishStatus.wechat && (
-                  <div className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--surface-soft)' }}>
-                    {publishStatus.wechat === 'success' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : publishStatus.wechat === 'failed' ? (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <div>
-                      <div className="theme-title text-sm font-medium">
-                        微信公众号
-                      </div>
-                      <div className="theme-muted text-xs">
-                        {publishStatus.wechat === 'success'
-                          ? '发布成功'
-                          : publishStatus.wechat === 'failed'
-                            ? '发布失败'
-                            : '等待中'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {publishStatus.mowen && (
-                  <div className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--surface-soft)' }}>
-                    {publishStatus.mowen === 'success' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : publishStatus.mowen === 'failed' ? (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <div>
-                      <div className="theme-title text-sm font-medium">
-                        墨问笔记
-                      </div>
-                      <div className="theme-muted text-xs">
-                        {publishStatus.mowen === 'success'
-                          ? '发布成功'
-                          : publishStatus.mowen === 'failed'
-                            ? '发布失败'
-                            : '等待中'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {publishStatus.obsidian && (
-                  <div className="flex items-center gap-3 rounded-lg p-3" style={{ background: 'var(--surface-soft)' }}>
-                    {publishStatus.obsidian === 'success' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : publishStatus.obsidian === 'failed' ? (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <div>
-                      <div className="theme-title text-sm font-medium">
-                        Obsidian
-                      </div>
-                      <div className="theme-muted text-xs">
-                        {publishStatus.obsidian === 'success'
-                          ? '发布成功'
-                          : publishStatus.obsidian === 'failed'
-                            ? '发布失败'
-                            : '等待中'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <PublishDistributionCard records={publishRecords} loading={recordsLoading} />
 
           {/* Activity logs */}
           <div className="theme-card p-5">

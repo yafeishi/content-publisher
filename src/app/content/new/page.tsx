@@ -19,7 +19,10 @@ import RichTextEditor from '@/components/RichTextEditor';
 import ImageManager from '@/components/ImageManager';
 import ContentPreviewModal from '@/components/ContentPreviewModal';
 import { useDialog } from '@/components/ui/dialog-center';
+import PublishingPlatformPicker, { type PlatformHealthResult } from '@/components/PublishingPlatformPicker';
+import { homepageBlockReason, parseBlockTagList } from '@/lib/homepage-note';
 import type { LayoutTemplate } from '@/lib/layout-template-types';
+import { platformLabel, PUBLISHING_PLATFORM_IDS } from '@/lib/publishing-platforms';
 import type { AppSettings } from '@/lib/settings-schema';
 
 interface ProjectOption {
@@ -39,12 +42,6 @@ interface PublishPlatformResult {
   message?: string;
   error?: string;
   warning?: string;
-}
-
-interface PlatformHealthResult {
-  ok: boolean;
-  status: 'success' | 'warning' | 'failed';
-  message: string;
 }
 
 type TiptapInsertImageFn = (src: string, alt?: string) => void;
@@ -76,14 +73,6 @@ const TEMPLATES = [
     body: `<p>姐妹们！今天又是充实的一天～✨</p><h2>今日完成</h2><p>✅ 第一件事</p><p>✅ 第二件事</p><p>✅ 第三件事</p><h2>感悟</h2><p>今天最大的收获是...</p><h2>明天计划</h2><p>🔮 计划一</p><p>🔮 计划二</p><hr><p>你们今天过得怎么样？评论区聊聊呗～👇</p><p>#日常分享 #生活记录 #今日感悟</p>`,
   },
 ];
-
-const getPlatformDisplayName = (platform: string) => {
-  if (platform === 'xiaohongshu') return '小红书';
-  if (platform === 'wechat') return '微信公众号';
-  if (platform === 'mowen') return '墨问笔记';
-  if (platform === 'obsidian') return 'Obsidian';
-  return platform;
-};
 
 const isVideoPath = (assetPath: string) => /\.(mp4|mov|webm|m4v|avi)$/i.test(assetPath);
 const isImagePath = (assetPath: string) => !isVideoPath(assetPath);
@@ -229,13 +218,17 @@ function NewContentForm() {
           fetch('/api/templates'),
         ]);
         if (settingsResp.ok) {
-          const settings = await settingsResp.json() as Pick<AppSettings, 'defaultLayoutTemplateId' | 'writingStylePreset'>;
+          const settings = await settingsResp.json() as Pick<AppSettings, 'defaultLayoutTemplateId' | 'writingStylePreset' | 'homepageBlockParenting' | 'homepageBlockTags'>;
           if (settings.defaultLayoutTemplateId) {
             setSelectedLayoutTemplateId(settings.defaultLayoutTemplateId);
           }
           if (settings.writingStylePreset) {
             setSelectedWritingStyle(settings.writingStylePreset);
           }
+          setHomepageGuard({
+            blockParenting: settings.homepageBlockParenting !== false,
+            blockTags: settings.homepageBlockTags || '育儿,党哥育儿,parenting,亲子',
+          });
         }
         if (templatesResp.ok) {
           const data = await templatesResp.json() as { templates?: LayoutTemplate[] };
@@ -252,6 +245,7 @@ function NewContentForm() {
 
   const [isPublishing, setIsPublishing] = useState(false);
   const [isTestingPlatforms, setIsTestingPlatforms] = useState(false);
+  const [homepageGuard, setHomepageGuard] = useState({ blockParenting: true, blockTags: '育儿,党哥育儿,parenting,亲子' });
   const [platformHealth, setPlatformHealth] = useState<Record<string, PlatformHealthResult>>({});
   const { notify } = useDialog();
 
@@ -328,7 +322,7 @@ function NewContentForm() {
             const warnings: string[] = [];
 
             for (const [platform, result] of Object.entries(results as Record<string, PublishPlatformResult>)) {
-              const platformName = getPlatformDisplayName(platform);
+              const platformName = platformLabel(platform);
               if (result.success) {
                 successes.push(result.message || `${platformName}: 发布成功`);
                 if (result.warning) {
@@ -420,7 +414,7 @@ function NewContentForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          platforms: ['xiaohongshu', 'wechat', 'mowen', 'obsidian'],
+          platforms: PUBLISHING_PLATFORM_IDS,
         }),
       });
       const data = await response.json() as {
@@ -737,84 +731,19 @@ function NewContentForm() {
                 {isTestingPlatforms ? '检测中...' : '连通性测试'}
               </button>
             </div>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('xiaohongshu')}
-                  onChange={() => togglePlatform('xiaohongshu')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>小红书</span>
-                {platformHealth.xiaohongshu && (
-                  <span className={`ml-auto text-xs ${platformHealth.xiaohongshu.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.xiaohongshu.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.xiaohongshu.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('wechat')}
-                  onChange={() => togglePlatform('wechat')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>微信公众号</span>
-                {platformHealth.wechat && (
-                  <span className={`ml-auto text-xs ${platformHealth.wechat.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.wechat.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.wechat.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('mowen')}
-                  onChange={() => togglePlatform('mowen')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>墨问笔记</span>
-                {platformHealth.mowen && (
-                  <span className={`ml-auto text-xs ${platformHealth.mowen.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.mowen.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.mowen.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes('obsidian')}
-                  onChange={() => togglePlatform('obsidian')}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Obsidian</span>
-                {platformHealth.obsidian && (
-                  <span className={`ml-auto text-xs ${platformHealth.obsidian.status === 'success'
-                    ? 'text-emerald-600'
-                    : platformHealth.obsidian.status === 'warning'
-                      ? 'text-amber-600'
-                      : 'text-red-600'
-                    }`}>
-                    {platformHealth.obsidian.message}
-                  </span>
-                )}
-              </label>
-            </div>
+            <PublishingPlatformPicker
+              platforms={platforms}
+              onToggle={togglePlatform}
+              health={platformHealth}
+              notice={platforms.includes('homepage')
+                ? homepageBlockReason({
+                  title,
+                  tags: [],
+                  enabled: homepageGuard.blockParenting,
+                  blockTags: parseBlockTagList(homepageGuard.blockTags),
+                })
+                : null}
+            />
 
             {platforms.includes('xiaohongshu') && (
               <div className="mt-3 p-3 bg-orange-50 rounded-lg">

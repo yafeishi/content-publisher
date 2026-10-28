@@ -8,6 +8,8 @@ import { marked } from 'marked';
 import { getAppSettings } from '@/lib/settings';
 import { applyLayoutTemplateToHtml, getLayoutTemplateById, parseTemplateIdFromTags } from '@/lib/layout-templates';
 import { ensureXiaohongshuMcpAvailable } from '@/lib/xiaohongshu-mcp';
+import { publishHomepageNote } from '@/lib/homepage-publish';
+import { platformLabel } from '@/lib/publishing-platforms';
 
 const execAsync = promisify(exec);
 const BUN_BIN = process.env.BUN_BIN || 'bun';
@@ -17,11 +19,7 @@ const FREEIMAGE_API_KEY = process.env.FREEIMAGE_API_KEY || '';
 let wechatTokenCache: { token: string; expiresAt: number } | null = null;
 
 function getPlatformLabel(platform: string): string {
-  if (platform === 'xiaohongshu') return '小红书';
-  if (platform === 'wechat') return '微信公众号';
-  if (platform === 'mowen') return '墨问笔记';
-  if (platform === 'obsidian') return 'Obsidian';
-  return platform;
+  return platformLabel(platform);
 }
 
 // Helper: call MCP tool via HTTP (Streamable HTTP + Session)
@@ -1762,6 +1760,17 @@ export async function POST(request: NextRequest) {
           tagsList,
           content.coverImage || undefined
         );
+      } else if (platform === 'homepage') {
+        result = await publishHomepageNote({
+          contentId,
+          title: content.title,
+          bodyHtml: content.body,
+          tags: tagsList,
+          images: imagesList,
+          coverImage: content.coverImage || undefined,
+          projectRoot: process.cwd(),
+          settings: appSettings,
+        });
       } else {
         result = { success: false, error: `Unknown platform: ${platform}` };
       }

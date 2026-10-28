@@ -3,6 +3,8 @@ import path from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAppSettings } from '@/lib/settings';
 import { ensureXiaohongshuMcpAvailable } from '@/lib/xiaohongshu-mcp';
+import { inspectHomepageRepo } from '@/lib/homepage-publish';
+import { PUBLISHING_PLATFORM_IDS } from '@/lib/publishing-platforms';
 
 type HealthStatus = 'success' | 'warning' | 'failed';
 
@@ -249,7 +251,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({})) as { platforms?: string[] };
     const requested = Array.isArray(body.platforms) && body.platforms.length > 0
       ? body.platforms
-      : ['xiaohongshu', 'wechat', 'mowen', 'obsidian'];
+      : [...PUBLISHING_PLATFORM_IDS];
 
     const results: Record<string, PlatformHealthResult> = {};
 
@@ -262,6 +264,9 @@ export async function POST(request: NextRequest) {
         results[platform] = await checkMowen();
       } else if (platform === 'obsidian') {
         results[platform] = await checkObsidian();
+      } else if (platform === 'homepage') {
+        const settings = await getAppSettings();
+        results[platform] = await inspectHomepageRepo(settings);
       }
     }
 
